@@ -1,32 +1,16 @@
-.js-counter {
+.serp-counter {
+    position: relative !important;
+}
+
+.serp-counter::before {
+    content: "#" attr(data-serp-counter);
     position: absolute;
-    top: 14px;
-    left: -50px;
-    line-height: 0;
-    float: left;
-    color: #bdc1c6;
-    font-size: 19px;
-    animation: linear fadeIn .3s;
-    user-select: none;
-}
-
-/* Featured snippet box */
-.c2xzTb {
-    overflow: visible !important;
-}
-
-/* Fix indented results not showing numbers */
-.jtfYYd,
-.kWxLod {
-    overflow: inherit !important;
-    contain: inherit!important;
-}
-
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-    }
-    to {
-        opacity: 1;
-    }
+    font-weight: bold;
+    font-family: sans-serif;
+    color: black;
+    font-size: 20px;
+    bottom: 0;
+    top: 0;
+    display: flex;
+    transform: translateX(calc(-100% - 20px));
 }

@@ -1,106 +1,103 @@
-function main() {
+function getElementsByXPath(xpath, parent) {
+    let results = [];
 
-    // Get SERPs
-    var elements = document.querySelectorAll('#search .yuRUbf');
-    var results = [...elements].filter(element => !element.closest(".ULSxyf")); // remove featured snippet box results
+    let query = document.evaluate(xpath, parent || document.body,
+        null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
 
-    // Calculate results per page
-    var resultStats = document.querySelector('#result-stats');
-    if (resultStats !== null) {
-        var resultStats = resultStats.innerHTML;
-
-        // Regex to match &nbsp; (or single space) surrounded by digits
-        // Replaces thousand seperator space with a .
-        var resultStats = resultStats.replace(/(?<=[0-9]{1,3})(&nbsp;|\s{1})(?=[0-9]{1,3})/g, '.');
-
-        // Regex to get current page from #resultStats
-        // Get integers from two string for
-        //     About 22.600.000 results (0,43 seconds) mats:
-        //
-        //     (Two matches == first page)
-        //
-        //     Page 2 of about 22.600.000 results (0,50 seconds)
-        //     (First match is the _current_ page)
-        //
-        //     Works for most known locales
-        //
-        //
-        var regExMatch = resultStats.match(/[0-9]+(\.|,|’)?[0-9]?(\.|,|’)?[0-9]?(\.|,|’)?[0-9]?(\.|,|’)?[0-9]?(\.|,|’)?[0-9]?(\.|,|’)?[0-9]?(\.|,|’)?[0-9]?(\.|,|’)?[0-9]?(\.|,|’)?[0-9]?/g);
-
-        // 2+ matches = first match is page number
-        var currentPage = 1;
-        if (typeof regExMatch[2] !== 'undefined') {
-            var currentPage = parseInt(regExMatch[0]);
-        }
-
-        var resultsPerPage = results.length;
-    } else {
-        // defaults for queries without resultsPerPage
-        var currentPage = 1;
-        var resultsPerPage = 10;
+    for (let i = 0, length = query.snapshotLength; i < length; ++i) {
+        results.push(query.snapshotItem(i));
     }
 
-    // Reset localstorage on page 1 for new searches
-    if (currentPage == 1) {
-        localStorage.removeItem('countLastPage');
-        localStorage.removeItem('lastPage');
-    }
-
-    // countActual = index. Starts at 0, resets every page
-    // countDisplay = Human friendly, stored in localStorage
-    var countDisplay = 1;
-    for (var countActual = 0; countActual < results.length; countActual++, countDisplay++) {
-
-        // Skip if URL is invisible (PAA box, other search features)
-        var height = window.getComputedStyle(results[countActual].querySelector('a h3')).height;
-        if (height == "auto") { var height = 0; }
-        if (height < 20) {
-            countDisplay--;
-            continue;
-        }
-
-        if (currentPage == 1) {
-            var count = countDisplay;
-        } else if (parseInt(localStorage.getItem('countLastPage')) !== null && (parseInt(localStorage.getItem('lastPage')) + 1) == currentPage) {
-            var count = (countDisplay + parseInt(localStorage.getItem('countLastPage')));
-        } else {
-            // Fallback for when localStorage is not set (no chronological navigation)
-            var count = (countActual + (currentPage * resultsPerPage)) - (resultsPerPage-1);
-        }
-
-        counter = document.createElement('div');
-        counter.className = 'js-counter';
-        counter.textContent = '#' + count;
-
-        results[countActual].append(counter);
-    }
-
-    localStorage.setItem('lastPage', currentPage);
-    localStorage.setItem('countLastPage', count);
-
-
-    return true;
-
+    return results;
 }
 
-// Listen to hash change
-// window.onhashchange and similar functions don't work with instant search
-oldHash = location.hash;
-var hashchange = setInterval(function() {
 
-    currentHash = location.hash;
+function sliceIntoChunks(arr, chunkSize) {
+    const results = [];
 
-    if (currentHash != oldHash) {
+    for (let i = 0; i < arr.length; i += chunkSize) {
+        const chunk = arr.slice(i, i + chunkSize);
 
-        // hash has changed, run function again
-        setTimeout(main, 750);
-
-        // set curenthash again
-        // and keep listening
-        oldHash = currentHash;
+        results.push(chunk);
     }
 
+    return results;
+}
+
+
+function mode(arr) {
+    return arr.sort((a, b) => arr.filter(v => v === a).length - arr.filter(v => v === b).length).pop();
+}
+
+
+function counterOffset() {
+    if (location.href) {
+        const match = location.href.match(/start=(?<offset>\d+)/);
+
+        return +match?.groups?.offset || 0;
+    }
+
+    return 0;
+}
+
+
+
+function getOffset(element) {
+    const rect = element.getBoundingClientRect();
+
+    return {
+        left: rect.left + window.scrollX,
+        top: rect.top + window.scrollY,
+        height: rect.height,
+    };
+}
+
+
+function main() {
+    const httpsElements = sliceIntoChunks(getElementsByXPath("//*[text()[contains(.,'https://')]]"), 3).map((arr) => arr.sort(() => Math.random() - 0.5)).flat();
+
+    const ancestors = [];
+
+    for (let i = 0; i < httpsElements.length - 1; i += 2) {
+        const range = new Range();
+
+        range.setStart(httpsElements[i], 0);
+        range.setEnd(httpsElements[i + 1], 0);
+
+        ancestors.push(range.commonAncestorContainer);
+    }
+
+    const root = mode(ancestors);
+
+    const results = Array.from(document.querySelectorAll("div", root)).filter((node) => node.parentElement === root);
+
+    const filtered = results.filter((serp) => {
+        return !serp.textContent.match(/Znajdź wyniki na|Podobne wyszukiwania|Więcej miejsc|Podobne pytania/);
+    });
+
+    let position = counterOffset() + 1;
+
+    for (let i = 0; i < filtered.length; i++) {
+        const node = filtered[i];
+        const subresults = [...new Set(getElementsByXPath("descendant::*[text()[contains(.,'http')]]", node)
+            .filter((e) => e.textContent.indexOf("http://") === 0 || e.textContent.indexOf("https://") === 0)
+            .map((e) => getOffset(e))
+            .filter((rect) => rect.height > 0)
+            .map((rect) => Math.floor(rect.top / 10) * 10))]
+            .length;
+
+        node.setAttribute("data-serp-counter", subresults >= 2 ? `${position}-${position + subresults - 1}` : `${position}`);
+        node.classList.add("serp-counter");
+
+        position += subresults >= 2 ? subresults : 1;
+    }
+}
+
+
+setInterval(() => {
+    if (!document.querySelector(".serp-counter")) {
+        setTimeout(main, 750);
+    }
 }, 750);
 
-// run on page load
-setTimeout(main, 750);
+setTimeout(main(), 750);
