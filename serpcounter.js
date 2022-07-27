@@ -53,7 +53,7 @@ function getOffset(element) {
 }
 
 
-function main() {
+function main({ textFilters, cssFilters }) {
     const httpsElements = sliceIntoChunks(getElementsByXPath("//*[text()[contains(.,'https://')]]"), 3).map((arr) => arr.sort(() => Math.random() - 0.5)).flat();
 
     const ancestors = [];
@@ -68,23 +68,52 @@ function main() {
     }
 
     const root = mode(ancestors);
+    const results = Array
+        .from(document.querySelectorAll("div", root))
+        .filter((node) => node.parentElement === root);
 
-    const results = Array.from(document.querySelectorAll("div", root)).filter((node) => node.parentElement === root);
+    const blacklist = textFilters
+        .split("\n")
+        .map(e => e.trim())
+        .filter(e => e.length);
 
-    const filtered = results.filter((serp) => {
-        return !serp.textContent.match(/Znajdź wyniki na|Podobne wyszukiwania|Więcej miejsc|Podobne pytania/);
+    const blacklistRegExp = blacklist.join("|");
+
+    let filtered = results.filter((serp) => {
+
+        // if contains blacklisted string
+        if (serp.textContent.match(new RegExp(blacklistRegExp))) {
+            console.log("contains blacklisted string", serp);
+
+            // search for blacklisted strings
+            const analysis = blacklist.flatMap((phrase) => {
+                const elements = getElementsByXPath(`descendant::*[text()[contains(., "${phrase}")]]`, serp);
+
+                return elements.map((element) => {
+                    const bbox = element.getBoundingClientRect();
+
+                    return bbox.width > 0 && bbox.height > 0;
+                });
+            });
+
+            // return false if any blacklisted string is visible
+            return !analysis.some(visible => visible);
+        } else {
+            return true;
+        }
     });
 
     let position = counterOffset() + 1;
 
     for (let i = 0; i < filtered.length; i++) {
         const node = filtered[i];
-        const subresults = [...new Set(getElementsByXPath("descendant::*[text()[contains(.,'http')]]", node)
-            .filter((e) => e.textContent.indexOf("http://") === 0 || e.textContent.indexOf("https://") === 0)
-            .map((e) => getOffset(e))
-            .filter((rect) => rect.height > 0)
-            .map((rect) => Math.floor(rect.top / 10) * 10))]
-            .length;
+        const subresults = [
+            ...new Set(getElementsByXPath("descendant::*[text()[contains(.,'http')]]", node)
+                .filter(node => node.textContent.indexOf("http://") === 0 || node.textContent.indexOf("https://") === 0)
+                .map(node => getOffset(node))
+                .filter(rect => rect.height > 0)
+                .map(rect => Math.floor(rect.top / 10) * 10))
+        ].length;
 
         node.setAttribute("data-serp-counter", subresults >= 2 ? `${position}-${position + subresults - 1}` : `${position}`);
         node.classList.add("serp-counter");
@@ -93,11 +122,12 @@ function main() {
     }
 }
 
+chrome.storage.sync.get(["textFilters", "cssFilters"], (options) => {
+    setInterval(() => {
+        if (!document.querySelector(".serp-counter")) {
+            setTimeout(main(options), 750);
+        }
+    }, 750);
 
-setInterval(() => {
-    if (!document.querySelector(".serp-counter")) {
-        setTimeout(main, 750);
-    }
-}, 750);
-
-setTimeout(main(), 750);
+    setTimeout(main(options), 750);
+});

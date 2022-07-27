@@ -5,9 +5,17 @@
     "version": "1.6.1",
     "description": "Adds a counter next to search results in Google to show its ranking.",
 
+    "background": {
+        "service_worker": "background.js"
+    },
+
     "content_scripts": [{
-        "css": ["serpcounter.css"],
-        "js": ["serpcounter.js"],
+        "css": [
+            "serpcounter.css"
+        ],
+        "js": [
+            "serpcounter.js"
+        ],
         "matches": [
             "*://www.google.ad/*",
             "*://www.google.ae/*",
@@ -201,8 +209,12 @@
             "*://*.google.*/?gws_rd*",
             "*://*.google.*/?gfe_rd*"
         ],
-        "run_at": "document_end"
+        "run_at": "document_idle"
     }],
+
+    "permissions": [
+        "storage"
+    ],
 
     "action": {
         "default_icon": {
@@ -216,6 +228,7 @@
         "16": "icons/icon16.png",
         "48": "icons/icon48.png",
         "128": "icons/icon128.png"
-    }
+    },
 
+    "options_page": "options.html"
 }
