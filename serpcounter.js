@@ -1,7 +1,7 @@
 function getElementsByXPath(xpath, parent) {
-    let results = [];
+    const results = [];
 
-    let query = document.evaluate(xpath, parent || document.body,
+    const query = document.evaluate(xpath, parent || document.body,
         null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
 
     for (let i = 0, length = query.snapshotLength; i < length; ++i) {
@@ -10,7 +10,6 @@ function getElementsByXPath(xpath, parent) {
 
     return results;
 }
-
 
 function sliceIntoChunks(arr, chunkSize) {
     const results = [];
@@ -24,11 +23,9 @@ function sliceIntoChunks(arr, chunkSize) {
     return results;
 }
 
-
 function mode(arr) {
     return arr.sort((a, b) => arr.filter(v => v === a).length - arr.filter(v => v === b).length).pop();
 }
-
 
 function counterOffset() {
     if (location.href) {
@@ -40,8 +37,6 @@ function counterOffset() {
     return 0;
 }
 
-
-
 function getOffset(element) {
     const rect = element.getBoundingClientRect();
 
@@ -52,25 +47,31 @@ function getOffset(element) {
     };
 }
 
-
 function main({ textFilters, cssFilters }) {
-    const httpsElements = sliceIntoChunks(getElementsByXPath("//*[text()[contains(.,'https://')]]"), 3).map((arr) => arr.sort(() => Math.random() - 0.5)).flat();
+    // Search for all elements that contains "https://"
+    const httpsElements = getElementsByXPath("//*[text()[contains(.,'https://')]]");
+    const randomizedHttpsElements = sliceIntoChunks(httpsElements, 3).map((arr) => arr.sort(() => Math.random() - 0.5)).flat();
 
-    const ancestors = [];
 
-    for (let i = 0; i < httpsElements.length - 1; i += 2) {
+    // The most common container that occurs
+    // is probably the parent of all organic search results.
+    const containers = [];
+
+    for (let i = 0; i < randomizedHttpsElements.length - 1; i += 2) {
         const range = new Range();
 
-        range.setStart(httpsElements[i], 0);
-        range.setEnd(httpsElements[i + 1], 0);
+        range.setStart(randomizedHttpsElements[i], 0);
+        range.setEnd(randomizedHttpsElements[i + 1], 0);
 
-        ancestors.push(range.commonAncestorContainer);
+        containers.push(range.commonAncestorContainer);
     }
 
-    const root = mode(ancestors);
+    // Find most common element
+    const serps = mode(containers);
+
     const results = Array
-        .from(document.querySelectorAll("div", root))
-        .filter((node) => node.parentElement === root);
+        .from(document.querySelectorAll("div", serps))
+        .filter((node) => node.parentElement === serps);
 
     const blacklist = textFilters
         .split("\n")
@@ -116,7 +117,6 @@ function main({ textFilters, cssFilters }) {
         ].length;
 
         node.setAttribute("data-serp-counter", subresults >= 2 ? `${position}-${position + subresults - 1}` : `${position}`);
-        node.classList.add("serp-counter");
 
         position += subresults >= 2 ? subresults : 1;
     }

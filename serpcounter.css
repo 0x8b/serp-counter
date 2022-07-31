@@ -1,16 +1,13 @@
-.serp-counter {
+[data-serp-counter] {
     position: relative !important;
 }
 
-.serp-counter::before {
+[data-serp-counter]::before {
     content: "#" attr(data-serp-counter);
     position: absolute;
     font-weight: bold;
     font-family: sans-serif;
-    color: grey;
+    color: #5f6368;
     font-size: 20px;
-    bottom: 0;
-    top: 0;
-    display: flex;
     transform: translateX(calc(-100% - 20px));
 }
